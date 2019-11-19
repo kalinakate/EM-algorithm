@@ -1,0 +1,262 @@
+---
+title: "DZ4_EM"
+author: "Kate"
+date: '27 марта 2018 г '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(mvtnorm) 
+```
+
+### EM-алгоритм 
+
+##Вариант 1: Реализовать EM-алгоритм для оценивания параметров нормальной смеси. Визуализировать полученное решение. 
+
+Мои данные: cross 
+
+```{r} 
+tab <- read.table(file="D:\\Учеба\\8 семестр\\Коробейников\\cross.txt", header=TRUE, sep=" ") 
+tab 
+n <- nrow(tab)
+y <- array(t(tab),dim=c(2,n))
+
+``` 
+
+
+Нарисуем наши данные: 
+
+```{r} 
+plot(tab) 
+``` 
+
+```{r}
+
+```
+
+Напишем функции для всех наших оценок: 
+
+```{r}
+mu1_n<-function(x,z){
+  n=length(z)
+  return(apply(x %*% diag((1-z)/(n-sum(z))),1,sum))
+}
+
+mu2_n<-function(x,z){
+  n=length(z)
+  return(apply(x %*% diag((z/sum(z))),1,sum))
+}
+
+
+pi_n<-function(z){
+  n=length(z)
+  return(sum(z)/n)
+}
+
+Sigma_n<-function(x,z){
+  n=length(z)
+  mat<-function(x){
+    return(x%*%t(x))
+  }
+  
+  sigma<-1/n*apply(
+    apply((x-mu1_n(x,z)),2,mat)%*%diag(1-z)+apply(x-mu2_n(x,z),2,mat)%*%diag(z)
+    ,1,sum)
+  
+  return(matrix(sigma,ncol=2)) 
+}
+
+
+Sigma_n_1<-function(x,z){
+  n=length(z)
+  mat<-function(x){
+    return(x%*%t(x))
+  }
+  
+  sigma<-1/(n-sum(z))*apply(
+    apply((x-mu1_n(x,z)),2,mat)%*%diag(1-z)
+    ,1,sum)
+  
+  return(matrix(sigma,ncol=2)) 
+}
+
+
+Sigma_n_2<-function(x,z){
+  n=length(z)
+  mat<-function(x){
+    return(x%*%t(x))
+  }
+  
+  sigma<-1/(sum(z))*apply(
+    apply(x-mu2_n(x,z),2,mat)%*%diag(z)
+    ,1,sum)
+  
+  return(matrix(sigma,ncol=2)) 
+}
+```
+
+Перейдем к рассмотрению пар и зададим начальные значения: 
+```{r} 
+x <- y
+
+pi_k <- c(1/2 , 1/2)  #Одинаковые веса
+
+ze <- c()
+ze <- runif(500)
+mu1_k <- mu1_n(y, ze)  #математические ожидания случайных значений
+ze <- runif(500)
+mu2_k <- mu2_n(y, ze)
+
+Sigma_k_1 <- matrix(c(1 ,0 ,0 ,1), ncol=2)   #единичные матрицы
+Sigma_k_2 <- matrix(c(1 ,0 ,0 ,1), ncol=2)
+
+
+Sigma_k_1do <- matrix(c(0, 0, 0, 0), ncol=2)   #нулевые матрицы. типа значение до
+Sigma_k_2do <- matrix(c(0, 0, 0, 0), ncol=2)
+``` 
+
+```{r}
+new_z(tab)
+```
+
+###Итерации происходят до сходимости (норма разности векторов скрытых переменных или изменение логарифмического правдоподобия на каждой итерации не будет превышать заданную константу) или достижения максимального числа итераций.
+
+```{r}
+
+#Норма разности векторов:
+ALG <- function(eps){
+Norma <- function(x) {
+  max(colSums(abs(x)))
+}  
+  
+new_z<-function(y) {
+(pi_k*dmvnorm(y, mu2_k, Sigma_k_2))/((1-pi_k)*dmvnorm(y, mu1_k, Sigma_k_1)+pi_k*dmvnorm(y, mu2_k, Sigma_k_2))
+  }
+
+while(Norma(Sigma_k_1-Sigma_k_1do) > eps){
+
+  z <- apply(tab, 1, new_z)
+
+  pi_k <- pi_n(z)
+  mu1_k <- mu1_n(x,z)
+  mu2_k <- mu2_n(x,z)
+  Sigma_k_1do <- Sigma_k_1   
+  Sigma_k_2do <- Sigma_k_2
+  Sigma_k_1 <- Sigma_n_1(x,z)
+  Sigma_k_2 <- Sigma_n_2(x,z)
+  
+}
+
+mu1 <- mu1_n(y,z)
+mu2 <- mu2_n(y,z)
+sigma_1 <- Sigma_n_1(y,z)
+sigma_2 <- Sigma_n_2(y,z)
+Sigma_n_2(y,z)
+
+x1 <- seq(min(tab[,1]), max(tab[,1]), by=.1)
+y1 <- seq(min(tab[,2]), max(tab[,2]), by=.1)
+net1 <- outer(x1, y1, function(x,y) dmvnorm(cbind(x,y), mu1, sigma_1))
+net2 <- outer(x1, y1, function(x,y) dmvnorm(cbind(x,y), mu2, sigma_2))
+
+list(z=z, mu1=mu1, mu2=mu2, sigma_1=sigma_1, sigma_2=sigma_2, net1=net1, net2=net2)
+}
+
+```
+
+
+
+```{r}
+mu1 <- mu1_n(y,z)
+mu2 <- mu2_n(y,z)
+sigma_1 <- Sigma_n_1(y,z)
+sigma_2 <- Sigma_n_2(y,z)
+Sigma_n_2(y,z)
+```
+
+```{r}
+plot(tab)
+```
+
+```{r}
+x1 <- seq(min(tab[,1]), max(tab[,1]), by=.1)
+y1 <- seq(min(tab[,2]), max(tab[,2]), by=.1)
+net1 <- outer(x1, y1, function(x,y) dmvnorm(cbind(x,y), mu1, sigma_1))
+net2 <- outer(x1, y1, function(x,y) dmvnorm(cbind(x,y), mu2, sigma_2))
+```
+
+```{r}
+plot((z)*tab, col="red", xlim=c(-30,25), ylim=c(-20,20)) 
+points((1-z)*tab, col="blue") 
+```
+
+
+```{r}
+rgb(runif(1), runif(1), runif(1))
+plot(1:10, 1:10, col=rgb(runif(3), runif(3), runif(3)))
+plot(z*tab, col=rgb(z, 0 , 0), xlim=c(-2,2), ylim=c(-2,2)) 
+points((1-z)*tab, col=rgb(0, 1-z , 0)) 
+```
+
+
+```{r}
+plot((z)*tab,col="red", xlim=c(-30,25), ylim=c(-20,20)) 
+points((1-z)*tab,col="blue") 
+contour(x1, y1, net1, add=T) 
+contour(x1, y1, net2, add=T)
+```
+
+
+```{r}
+A1 <- ALG(0.1)
+
+A2 <- ALG(0.001)
+
+A3 <- ALG(0.0001)
+
+A4 <- ALG(0.00001)
+
+A5 <- ALG(0.00000000001)
+
+```
+
+
+```{r}
+plot((A1$z)*tab,col="red", xlim=c(-30,25), ylim=c(-20,20)) 
+points((1-A1$z)*tab,col="blue") 
+contour(x1, y1, A1$net1, add=T) 
+contour(x1, y1, A1$net2, add=T)
+
+plot((A2$z)*tab,col="red", xlim=c(-30,25), ylim=c(-20,20)) 
+points((1-A2$z)*tab,col="blue") 
+contour(x1, y1, A2$net1, add=T) 
+contour(x1, y1, A2$net2, add=T)
+
+plot((A3$z)*tab,col="red", xlim=c(-30,25), ylim=c(-20,20)) 
+points((1-A3$z)*tab,col="blue") 
+contour(x1, y1, A3$net1, add=T) 
+contour(x1, y1, A3$net2, add=T)
+
+plot((A4$z)*tab,col="red", xlim=c(-30,25), ylim=c(-20,20)) 
+points((1-A4$z)*tab,col="blue") 
+contour(x1, y1, A4$net1, add=T) 
+contour(x1, y1, A4$net2, add=T)
+
+plot((A5$z)*tab,col="red", xlim=c(-30,25), ylim=c(-20,20)) 
+points((1-A5$z)*tab,col="blue") 
+contour(x1, y1, A5$net1, add=T) 
+contour(x1, y1, A5$net2, add=T)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
